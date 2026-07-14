@@ -3,23 +3,14 @@ from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler, 
                           CallbackQueryHandler, ContextTypes, ConversationHandler, filters)
 
-# Состояние для диалога
 WAITING_FOR_JOB = 1
-# База данных
 user_jobs = {} 
-
-# Вставьте ваш токен сюда или используйте переменную окружения
 TOKEN = "8979345890:AAF30vdWHXNe7Z1yxeKtXI2taF1h_QcDXUg"
 
+# --- Основные функции ---
+
 async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
-    """Инструкция для пользователя"""
-    instruction = (
-        "👋 Привет! Я бот для учета профессий.\n\n"
-        "Мои команды:\n"
-        "/jobs - Посмотреть список всех занятых профессий\n"
-        "/myjob - Устроиться на работу или уволиться"
-    )
-    await update.message.reply_text(instruction)
+    await update.message.reply_text("Привет! Используй команды /jobs или /myjob, либо просто напиши 'Профессии' или 'Моя профессия'.")
 
 async def show_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "📋 **Список занятых профессий:**\n\n"
@@ -28,7 +19,13 @@ async def show_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     else:
         for uid, data in user_jobs.items():
             text += f"{data['name']}: {data['job']}\n"
-    await update.message.reply_text(text, parse_mode='Markdown')
+    
+    # Кнопки для действий прямо в списке
+    keyboard = [
+        [InlineKeyboardButton("💼 Устроиться", callback_data="start_join"),
+         InlineKeyboardButton("🚫 Уволиться", callback_data="quit")]
+    ]
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def my_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
@@ -43,6 +40,8 @@ async def my_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
     
     await update.message.reply_text(text, reply_markup=InlineKeyboardMarkup(keyboard))
 
+# --- Логика выбора и увольнения ---
+
 async def start_join(update: Update, context: ContextTypes.DEFAULT_TYPE):
     query = update.callback_query
     await query.answer()
@@ -53,7 +52,6 @@ async def save_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
     user = update.effective_user
     job_name = update.message.text
     
-    # Проверка на занятость профессии
     for uid, data in user_jobs.items():
         if data['job'].lower() == job_name.lower():
             await update.message.reply_text("❌ Эта профессия уже занята!")
@@ -75,7 +73,7 @@ async def quit_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🤷‍♂️ У вас нет работы.")
     return ConversationHandler.END
 
-# Настройка приложения
+# --- Запуск ---
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
 
@@ -86,9 +84,15 @@ if __name__ == '__main__':
         fallbacks=[]
     )
 
+    # Команды
     app.add_handler(CommandHandler("start", start))
     app.add_handler(CommandHandler("jobs", show_jobs))
     app.add_handler(CommandHandler("myjob", my_job))
+
+    # Ответы на текст без команд (регистронезависимые)
+    app.add_handler(MessageHandler(filters.Regex('(?i)^Профессии$'), show_jobs))
+    app.add_handler(MessageHandler(filters.Regex('(?i)^Моя профессия$'), my_job))
+    
     app.add_handler(conv_handler)
 
     print("Бот запущен...")
