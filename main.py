@@ -7,11 +7,12 @@ from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler,
 TOKEN = "8979345890:AAF30vdWHXNe7Z1yxeKtXI2taF1h_QcDXUg"
 DATA_FILE = "data.json"
 
+# Список из 100 профессий, разбитый по категориям
 CATEGORIES = {
-    "Бизнес и Юрис": ["Юрист", "Адвокат", "Нотариус", "Бухгалтер", "Аудитор", "Менеджер", "Аналитик", "Трейдер", "Риелтор", "Логист"],
-    "Медицина и Психология": ["Психолог", "Врач", "Стоматолог", "Массажист", "Ветеринар", "Косметолог", "Фармацевт", "Лаборант", "Подолог", "Биолог"],
-    "Интим и Мода": ["Эскорт-модель", "Стриптизер", "Модель (Adult)", "Мастер по имиджу", "Парикмахер", "Визажист", "Стилист", "Фотограф", "Дизайнер", "Швея"],
-    "IT и Творчество": ["Программист", "Системный администратор", "Тестировщик", "Верстальщик", "SEO-специалист", "Таргетолог", "СММ-менеджер", "Художник", "Музыкант", "Актер"]
+    "Бизнес и Юрис": ["Юрист", "Адвокат", "Нотариус", "Бухгалтер", "Аудитор", "Менеджер", "Аналитик", "Трейдер", "Риелтор", "Логист", "Секретарь", "HR-менеджер", "Директор", "Маркетолог", "Копирайтер", "Блогер", "Риелтор", "Консультант", "Детектив", "Предприниматель", "Агент", "Страховщик", "Экономист", "Стартапер", "Брокер"],
+    "Медицина и Психология": ["Психолог", "Врач", "Стоматолог", "Массажист", "Ветеринар", "Косметолог", "Фармацевт", "Лаборант", "Подолог", "Биолог", "Хирург", "Логопед", "Диетолог", "Окулист", "Психиатр", "Медбрат", "Невролог", "Кардиолог", "Педиатр", "Терапевт", "Травматолог", "Реаниматолог", "Гинеколог", "Уролог", "Эндокринолог"],
+    "Интим и Мода": ["Эскорт-модель", "Стриптизер", "Модель (Adult)", "Мастер по имиджу", "Парикмахер", "Визажист", "Стилист", "Фотограф", "Дизайнер", "Швея", "Модель", "Модельер", "Тату-мастер", "Косплеер", "Мастер маникюра", "Ювелир", "Брадобрей", "Модельер-конструктор", "Дизайнер интерьера", "Флорист", "Художник", "Иллюстратор", "Декоратор", "Графический дизайнер", "Кутюрье"],
+    "IT и Творчество": ["Программист", "Системный администратор", "Тестировщик", "Верстальщик", "SEO-специалист", "Таргетолог", "СММ-менеджер", "Художник", "Музыкант", "Актер", "Режиссер", "Оператор", "Звукорежиссер", "Монтажер", "Диджей", "Хореограф", "Сценарист", "Аниматор", "Писатель", "Переводчик", "Журналист", "Ученый", "Астроном", "Геолог", "Физик"]
 }
 
 def load_data():
@@ -27,46 +28,77 @@ def save_data(data):
 
 user_jobs = load_data()
 
+# --- Логика ---
+
 async def show_jobs(update, context):
     text = "📋 **Список занятых профессий:**\n"
-    for uid, data in user_jobs.items():
-        text += f"{data['job']} — {data['name']}\n"
+    if not user_jobs:
+        text += "Все свободно!"
+    else:
+        for uid, data in user_jobs.items():
+            text += f"{data['job']} — {data['name']}\n"
     
-    # Кнопка «Устроиться» в общем списке
-    keyboard = [[InlineKeyboardButton("💼 Устроиться", callback_data="cats")]]
-    await update.message.reply_text(text or "Все свободно!", reply_markup=InlineKeyboardMarkup(keyboard))
+    uid = str(update.effective_user.id)
+    keyboard = [[InlineKeyboardButton("💼 Устроиться", callback_data=f"cats|{uid}")]]
+    await update.message.reply_text(text, parse_mode='Markdown', reply_markup=InlineKeyboardMarkup(keyboard))
+
+async def my_job(update, context):
+    user = update.effective_user
+    uid = str(user.id)
+    job = user_jobs.get(uid, {}).get("job", "Безработный")
+    
+    keyboard = []
+    if job == "Безработный":
+        keyboard.append([InlineKeyboardButton("💼 Выбрать профессию", callback_data=f"cats|{uid}")])
+    else:
+        keyboard.append([InlineKeyboardButton("🚫 Уволиться", callback_data=f"quit|{uid}")])
+    
+    await update.message.reply_text(f"👤 Ваша работа: {job}", reply_markup=InlineKeyboardMarkup(keyboard))
 
 async def button_handler(update, context):
     query = update.callback_query
-    data = query.data
     uid = str(query.from_user.id)
+    data_parts = query.data.split("|")
+    action = data_parts[0]
+    
+    # ПРОВЕРКА: Если ID пользователя не совпадает с тем, кто вызвал меню
+    if len(data_parts) > 1 and data_parts[-1] != uid:
+        await query.answer("❌ Это не ваше меню!", show_alert=True)
+        return
+
     await query.answer()
 
-    if data == "cats":
-        kb = [[InlineKeyboardButton(c, callback_data=f"cat_{c}")] for c in CATEGORIES.keys()]
-        kb.append([InlineKeyboardButton("« Назад", callback_data="back_main")])
+    if action == "cats":
+        kb = [[InlineKeyboardButton(c, callback_data=f"cat|{c}|{uid}")] for c in CATEGORIES.keys()]
         await query.edit_message_text("Выберите категорию:", reply_markup=InlineKeyboardMarkup(kb))
     
-    elif data == "back_main":
-        # Возвращаем в начальное меню устройства
-        kb = [[InlineKeyboardButton("💼 Выбрать профессию", callback_data="cats")]]
-        await query.edit_message_text("Меню устройства на работу:", reply_markup=InlineKeyboardMarkup(kb))
-
-    elif data.startswith("cat_"):
-        cat = data.split("_")[1]
-        kb = [[InlineKeyboardButton(j, callback_data=f"take_{j}")] for j in CATEGORIES[cat]]
-        kb.append([InlineKeyboardButton("« Назад", callback_data="cats")])
+    elif action == "cat":
+        cat = data_parts[1]
+        kb = [[InlineKeyboardButton(j, callback_data=f"take|{j}|{uid}")] for j in CATEGORIES[cat]]
+        kb.append([InlineKeyboardButton("« Назад", callback_data=f"cats|{uid}")])
         await query.edit_message_text(f"Профессии в {cat}:", reply_markup=InlineKeyboardMarkup(kb))
     
-    elif data.startswith("take_"):
-        job = data.split("_")[1]
+    elif action == "take":
+        job = data_parts[1]
         user_jobs[uid] = {"name": query.from_user.full_name, "job": job}
         save_data(user_jobs)
         await query.edit_message_text(f"✅ Вы устроились на: {job}")
+    
+    elif action == "quit":
+        if uid in user_jobs:
+            del user_jobs[uid]
+            save_data(user_jobs)
+            await query.edit_message_text("👋 Вы уволились.")
 
 if __name__ == '__main__':
     app = ApplicationBuilder().token(TOKEN).build()
+    
+    # Команды
     app.add_handler(CommandHandler("jobs", show_jobs))
+    app.add_handler(CommandHandler("myjob", my_job))
     app.add_handler(MessageHandler(filters.Regex('(?i)^Профессии$'), show_jobs))
+    app.add_handler(MessageHandler(filters.Regex('(?i)^Моя профессия$'), my_job))
     app.add_handler(CallbackQueryHandler(button_handler))
+    
+    print("Бот запущен...")
     app.run_polling()
