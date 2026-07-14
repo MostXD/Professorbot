@@ -1,11 +1,25 @@
+import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (ApplicationBuilder, CommandHandler, MessageHandler, 
                           CallbackQueryHandler, ContextTypes, ConversationHandler, filters)
 
-# Состояния для диалога
+# Состояние для диалога
 WAITING_FOR_JOB = 1
 # База данных
 user_jobs = {} 
+
+# Вставьте ваш токен сюда или используйте переменную окружения
+TOKEN = "8979345890:AAF30vdWHXNe7Z1yxeKtXI2taF1h_QcDXUg"
+
+async def start(update: Update, context: ContextTypes.DEFAULT_TYPE):
+    """Инструкция для пользователя"""
+    instruction = (
+        "👋 Привет! Я бот для учета профессий.\n\n"
+        "Мои команды:\n"
+        "/jobs - Посмотреть список всех занятых профессий\n"
+        "/myjob - Устроиться на работу или уволиться"
+    )
+    await update.message.reply_text(instruction)
 
 async def show_jobs(update: Update, context: ContextTypes.DEFAULT_TYPE):
     text = "📋 **Список занятых профессий:**\n\n"
@@ -61,19 +75,21 @@ async def quit_job(update: Update, context: ContextTypes.DEFAULT_TYPE):
         await query.edit_message_text("🤷‍♂️ У вас нет работы.")
     return ConversationHandler.END
 
-# Настройка бота с вашим токеном
-app = ApplicationBuilder().token("8979345890:AAF30vdWHXNe7Z1yxeKtXI2taF1h_QcDXUg").build()
+# Настройка приложения
+if __name__ == '__main__':
+    app = ApplicationBuilder().token(TOKEN).build()
 
-conv_handler = ConversationHandler(
-    entry_points=[CallbackQueryHandler(start_join, pattern="start_join"), 
-                  CallbackQueryHandler(quit_job, pattern="quit")],
-    states={WAITING_FOR_JOB: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_job)]},
-    fallbacks=[]
-)
+    conv_handler = ConversationHandler(
+        entry_points=[CallbackQueryHandler(start_join, pattern="start_join"), 
+                      CallbackQueryHandler(quit_job, pattern="quit")],
+        states={WAITING_FOR_JOB: [MessageHandler(filters.TEXT & ~filters.COMMAND, save_job)]},
+        fallbacks=[]
+    )
 
-app.add_handler(CommandHandler("профессии", show_jobs))
-app.add_handler(CommandHandler("моя_профессия", my_job))
-app.add_handler(conv_handler)
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CommandHandler("jobs", show_jobs))
+    app.add_handler(CommandHandler("myjob", my_job))
+    app.add_handler(conv_handler)
 
-print("Бот запущен...")
-app.run_polling()
+    print("Бот запущен...")
+    app.run_polling()
